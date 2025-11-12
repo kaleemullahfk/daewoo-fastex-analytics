@@ -1,7 +1,18 @@
+# Streamlit web app framework
 streamlit==1.39.0
+
+# Data manipulation
 pandas
 numpy
+
+# Data visualization
 plotly
+
+# Machine learning
 scikit-learn
+
+# Model persistence
 joblib
+
+# Image handling (for logo)
 pillow
