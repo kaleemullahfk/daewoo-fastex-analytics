@@ -630,8 +630,9 @@ def render_sidebar():
     st.sidebar.header("📞 Support")
     st.sidebar.markdown("""
     **Need help?**
-    - 📧 analytics@daewoofastex.com
-    - 📱 +92-XXX-XXXXXXX
+    - 📧 Daewoofastexsukkur@gmail.com
+    - 📱 +92-345-3874327
+    - 📘 Facebook.com/Daewoo FastEx
     """)
     
     return uploaded_file, model, feature_names, artifacts
