@@ -1,15 +1,18 @@
-# 🚀 Daewoo FastEx - Enhanced Streamlit Dashboard
-# Complete working version with perfect prediction integration
+# 🚀 Daewoo FastEx - Enhanced Analytics Dashboard
+# Complete with comprehensive visualizations
 
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import plotly.subplots as sp
 import joblib
 from io import BytesIO
 import os
 import numpy as np
 from datetime import datetime
+import warnings
+warnings.filterwarnings('ignore')
 
 # -------------------------------
 # ✅ PAGE CONFIG
@@ -34,59 +37,49 @@ st.markdown("""
         --daewoo-green: #00a650;
         --daewoo-orange: #ff6b00;
         --daewoo-red: #ff4444;
+        --daewoo-purple: #8a2be2;
     }
     
     .main-header {
         background: linear-gradient(135deg, #0047ba 0%, #003399 100%);
         color: white;
         padding: 2rem;
-        border-radius: 10px;
+        border-radius: 15px;
         margin-bottom: 2rem;
+        box-shadow: 0 4px 12px rgba(0, 71, 186, 0.3);
     }
     
-    .kpi-card {
+    .metric-card {
         background: white;
         padding: 1.5rem;
-        border-radius: 10px;
+        border-radius: 12px;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        border-left: 4px solid var(--daewoo-blue);
+        border-left: 5px solid var(--daewoo-blue);
         margin-bottom: 1rem;
+        transition: transform 0.3s ease;
     }
     
-    .kpi-number {
-        font-size: 2rem;
-        font-weight: bold;
-        color: var(--daewoo-blue);
-        margin-bottom: 0.5rem;
+    .metric-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
     }
     
-    .kpi-label {
-        font-size: 0.9rem;
-        color: #666;
-        font-weight: 500;
+    .chart-container {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-bottom: 1.5rem;
+        border: 1px solid #e0e0e0;
     }
     
     .prediction-box {
         background: linear-gradient(135deg, #f8f9ff 0%, #e6f0ff 100%);
         padding: 2rem;
-        border-radius: 10px;
-        border: 2px solid #e0e0e0;
+        border-radius: 15px;
+        border: 2px solid var(--daewoo-light-blue);
         margin: 1rem 0;
-    }
-    
-    .success-box {
-        background: linear-gradient(135deg, #f0fff4 0%, #e6ffe6 100%);
-        border-left: 4px solid var(--daewoo-green);
-    }
-    
-    .warning-box {
-        background: linear-gradient(135deg, #fffaf0 0%, #fff5e6 100%);
-        border-left: 4px solid var(--daewoo-orange);
-    }
-    
-    .danger-box {
-        background: linear-gradient(135deg, #fff0f0 0%, #ffe6e6 100%);
-        border-left: 4px solid var(--daewoo-red);
+        box-shadow: 0 4px 12px rgba(0, 71, 186, 0.1);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -98,7 +91,6 @@ def render_header():
     col1, col2 = st.columns([1, 4])
     
     with col1:
-        # Try to load logo
         current_dir = os.path.dirname(os.path.abspath(__file__))
         logo_path = os.path.join(current_dir, "assets", "daewoo_logo.png")
         
@@ -108,7 +100,7 @@ def render_header():
             st.markdown("""
             <div style='width:120px; height:120px; background:#0047ba; color:white; 
                         display:flex; align-items:center; justify-content:center; 
-                        border-radius:10px; font-weight:bold; font-size:14px; text-align:center;'>
+                        border-radius:12px; font-weight:bold; font-size:14px; text-align:center;'>
                 DAE WOO<br>FASTEX
             </div>
             """, unsafe_allow_html=True)
@@ -116,8 +108,8 @@ def render_header():
     with col2:
         st.markdown("""
         <div class='main-header'>
-            <h1 style='margin:0; font-size:2.5em;'>🚚 Daewoo FastEx Analytics</h1>
-            <p style='margin:0; font-size:1.2em; opacity:0.9;'>Intelligent Shipment Performance & AI Prediction Platform</p>
+            <h1 style='margin:0; font-size:2.8em;'>🚚 Daewoo FastEx Analytics</h1>
+            <p style='margin:0; font-size:1.3em; opacity:0.9;'>Comprehensive Logistics Intelligence Platform</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -136,7 +128,6 @@ def load_prediction_model():
         artifacts_path = os.path.join(current_dir, "outputs", "model_artifacts.joblib")
         feature_names_path = os.path.join(current_dir, "outputs", "feature_names.joblib")
         
-        # Check if all required files exist
         if all(os.path.exists(path) for path in [model_path, artifacts_path, feature_names_path]):
             model = joblib.load(model_path)
             artifacts = joblib.load(artifacts_path)
@@ -150,7 +141,7 @@ def load_prediction_model():
             if not os.path.exists(artifacts_path): missing_files.append("model_artifacts.joblib")
             if not os.path.exists(feature_names_path): missing_files.append("feature_names.joblib")
             
-            st.sidebar.error(f"❌ Missing model files: {', '.join(missing_files)}")
+            st.sidebar.error(f"❌ Missing: {', '.join(missing_files)}")
             return None, [], {}
             
     except Exception as e:
@@ -184,10 +175,17 @@ def load_data(uploaded_file):
                 df[col] = pd.to_datetime(df[col], errors='coerce')
         
         # Clean text columns
-        text_columns = ['OriginCity', 'DestinationCity', 'ServiceType', 'DeliveryMode', 'Status']
+        text_columns = ['OriginCity', 'DestinationCity', 'ServiceType', 'DeliveryMode', 'Status', 'PackageType', 'DelayReason']
         for col in text_columns:
             if col in df.columns:
                 df[col] = df[col].astype(str).str.strip().str.title()
+        
+        # Extract numeric values from mixed columns
+        if 'WeightKg' in df.columns:
+            df['WeightKg'] = pd.to_numeric(df['WeightKg'].astype(str).str.extract('(\d+\.?\d*)')[0], errors='coerce')
+        
+        if 'Price' in df.columns:
+            df['Price'] = pd.to_numeric(df['Price'].astype(str).str.extract('(\d+\.?\d*)')[0], errors='coerce')
         
         return df
         
@@ -196,39 +194,311 @@ def load_data(uploaded_file):
         return None
 
 def calculate_kpis(df):
-    """Calculate key performance indicators"""
+    """Calculate comprehensive key performance indicators"""
     kpis = {}
     
     kpis['total_shipments'] = len(df)
     kpis['total_revenue'] = df['Price'].sum() if 'Price' in df.columns else 0
     kpis['avg_weight'] = df['WeightKg'].mean() if 'WeightKg' in df.columns else 0
     kpis['avg_price'] = df['Price'].mean() if 'Price' in df.columns else 0
+    kpis['max_weight'] = df['WeightKg'].max() if 'WeightKg' in df.columns else 0
+    kpis['min_weight'] = df['WeightKg'].min() if 'WeightKg' in df.columns else 0
     
     # Calculate delivery performance
     if all(col in df.columns for col in ['DeliveryDate', 'PickupDate']):
         df['delivery_days'] = (df['DeliveryDate'] - df['PickupDate']).dt.days
         kpis['avg_delivery_days'] = df['delivery_days'].mean()
+        kpis['max_delivery_days'] = df['delivery_days'].max()
+        kpis['min_delivery_days'] = df['delivery_days'].min()
     
     # Calculate status counts
     if 'Status' in df.columns:
         kpis['on_time'] = len(df[df['Status'].str.contains('Delivered|Completed', case=False, na=False)])
         kpis['delayed'] = len(df[df['Status'].str.contains('Delay|Late', case=False, na=False)])
+        kpis['in_transit'] = len(df[df['Status'].str.contains('Transit|Processing', case=False, na=False)])
     else:
         kpis['on_time'] = 0
         kpis['delayed'] = 0
+        kpis['in_transit'] = 0
     
     kpis['on_time_rate'] = (kpis['on_time'] / kpis['total_shipments'] * 100) if kpis['total_shipments'] > 0 else 0
+    kpis['delay_rate'] = (kpis['delayed'] / kpis['total_shipments'] * 100) if kpis['total_shipments'] > 0 else 0
+    
+    # City statistics
+    if 'OriginCity' in df.columns:
+        kpis['unique_origins'] = df['OriginCity'].nunique()
+        kpis['top_origin'] = df['OriginCity'].mode()[0] if len(df['OriginCity'].mode()) > 0 else 'N/A'
+    
+    if 'DestinationCity' in df.columns:
+        kpis['unique_destinations'] = df['DestinationCity'].nunique()
+        kpis['top_destination'] = df['DestinationCity'].mode()[0] if len(df['DestinationCity'].mode()) > 0 else 'N/A'
     
     return kpis
+
+# -------------------------------
+# ✅ COMPREHENSIVE VISUALIZATIONS
+# -------------------------------
+def create_comprehensive_visualizations(df, filtered_df):
+    """Create all possible visualizations for the data"""
+    
+    # 1. SERVICE TYPE ANALYSIS
+    st.markdown("### 📦 Service Type Analysis")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if 'ServiceType' in filtered_df.columns:
+            service_counts = filtered_df['ServiceType'].value_counts()
+            fig_service_pie = px.pie(
+                values=service_counts.values,
+                names=service_counts.index,
+                title="Service Type Distribution",
+                hole=0.4,
+                color_discrete_sequence=px.colors.qualitative.Set3
+            )
+            fig_service_pie.update_traces(textposition='inside', textinfo='percent+label')
+            st.plotly_chart(fig_service_pie, use_container_width=True)
+    
+    with col2:
+        if 'ServiceType' in filtered_df.columns and 'Price' in filtered_df.columns:
+            service_price = filtered_df.groupby('ServiceType')['Price'].mean().sort_values(ascending=False)
+            fig_service_price = px.bar(
+                x=service_price.index,
+                y=service_price.values,
+                title="Average Price by Service Type",
+                labels={'x': 'Service Type', 'y': 'Average Price'},
+                color=service_price.values,
+                color_continuous_scale='Blues'
+            )
+            st.plotly_chart(fig_service_price, use_container_width=True)
+    
+    # 2. GEOGRAPHICAL ANALYSIS
+    st.markdown("### 🗺️ Geographical Analysis")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if 'OriginCity' in filtered_df.columns:
+            origin_counts = filtered_df['OriginCity'].value_counts().head(10)
+            fig_origin = px.bar(
+                x=origin_counts.values,
+                y=origin_counts.index,
+                orientation='h',
+                title="Top 10 Origin Cities",
+                labels={'x': 'Number of Shipments', 'y': 'City'},
+                color=origin_counts.values,
+                color_continuous_scale='Viridis'
+            )
+            st.plotly_chart(fig_origin, use_container_width=True)
+    
+    with col2:
+        if 'DestinationCity' in filtered_df.columns:
+            dest_counts = filtered_df['DestinationCity'].value_counts().head(10)
+            fig_dest = px.bar(
+                x=dest_counts.values,
+                y=dest_counts.index,
+                orientation='h',
+                title="Top 10 Destination Cities",
+                labels={'x': 'Number of Shipments', 'y': 'City'},
+                color=dest_counts.values,
+                color_continuous_scale='Plasma'
+            )
+            st.plotly_chart(fig_dest, use_container_width=True)
+    
+    # 3. ROUTE ANALYSIS
+    st.markdown("### 🚛 Route Analysis")
+    if all(col in filtered_df.columns for col in ['OriginCity', 'DestinationCity']):
+        route_counts = filtered_df.groupby(['OriginCity', 'DestinationCity']).size().reset_index(name='Count')
+        top_routes = route_counts.nlargest(10, 'Count')
+        
+        fig_routes = px.bar(
+            top_routes,
+            x='Count',
+            y=top_routes.apply(lambda x: f"{x['OriginCity']} → {x['DestinationCity']}", axis=1),
+            orientation='h',
+            title="Top 10 Busiest Routes",
+            labels={'x': 'Number of Shipments', 'y': 'Route'},
+            color='Count',
+            color_continuous_scale='Rainbow'
+        )
+        st.plotly_chart(fig_routes, use_container_width=True)
+    
+    # 4. PRICE & WEIGHT ANALYSIS
+    st.markdown("### 💰 Price & Weight Analysis")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if 'Price' in filtered_df.columns:
+            fig_price_dist = px.histogram(
+                filtered_df,
+                x='Price',
+                nbins=30,
+                title="Price Distribution",
+                color_discrete_sequence=['#0047ba']
+            )
+            fig_price_dist.update_layout(bargap=0.1)
+            st.plotly_chart(fig_price_dist, use_container_width=True)
+    
+    with col2:
+        if 'WeightKg' in filtered_df.columns:
+            fig_weight_dist = px.histogram(
+                filtered_df,
+                x='WeightKg',
+                nbins=30,
+                title="Weight Distribution (Kg)",
+                color_discrete_sequence=['#00a650']
+            )
+            fig_weight_dist.update_layout(bargap=0.1)
+            st.plotly_chart(fig_weight_dist, use_container_width=True)
+    
+    # 5. DELIVERY PERFORMANCE
+    st.markdown("### ⏱️ Delivery Performance")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if 'Status' in filtered_df.columns:
+            status_counts = filtered_df['Status'].value_counts()
+            fig_status = px.pie(
+                values=status_counts.values,
+                names=status_counts.index,
+                title="Delivery Status Distribution",
+                color_discrete_sequence=px.colors.qualitative.Set2
+            )
+            st.plotly_chart(fig_status, use_container_width=True)
+    
+    with col2:
+        if 'Status' in filtered_df.columns and 'ServiceType' in filtered_df.columns:
+            delay_by_service = filtered_df[filtered_df['Status'].str.contains('Delay', case=False, na=False)]
+            if not delay_by_service.empty:
+                service_delays = delay_by_service['ServiceType'].value_counts()
+                fig_service_delays = px.bar(
+                    x=service_delays.index,
+                    y=service_delays.values,
+                    title="Delays by Service Type",
+                    labels={'x': 'Service Type', 'y': 'Number of Delays'},
+                    color=service_delays.values,
+                    color_continuous_scale='Reds'
+                )
+                st.plotly_chart(fig_service_delays, use_container_width=True)
+    
+    # 6. TEMPORAL ANALYSIS
+    st.markdown("### 📅 Temporal Analysis")
+    
+    if 'BookingDate' in filtered_df.columns:
+        # Daily trends
+        filtered_df['BookingDate'] = pd.to_datetime(filtered_df['BookingDate'])
+        daily_trends = filtered_df.groupby(filtered_df['BookingDate'].dt.date).agg({
+            'Price': 'sum',
+            'TrackingID': 'count'
+        }).reset_index()
+        daily_trends.columns = ['Date', 'Daily Revenue', 'Daily Shipments']
+        
+        fig_temporal = sp.make_subplots(specs=[[{"secondary_y": True}]])
+        
+        # Revenue line
+        fig_temporal.add_trace(
+            go.Scatter(x=daily_trends['Date'], y=daily_trends['Daily Revenue'], 
+                      name="Daily Revenue", line=dict(color='#0047ba', width=3)),
+            secondary_y=False,
+        )
+        
+        # Shipments line
+        fig_temporal.add_trace(
+            go.Scatter(x=daily_trends['Date'], y=daily_trends['Daily Shipments'],
+                      name="Daily Shipments", line=dict(color='#00a650', width=3)),
+            secondary_y=True,
+        )
+        
+        fig_temporal.update_layout(
+            title="Daily Revenue & Shipment Trends",
+            xaxis_title="Date",
+            hovermode='x unified'
+        )
+        
+        fig_temporal.update_yaxes(title_text="Revenue", secondary_y=False)
+        fig_temporal.update_yaxes(title_text="Shipments", secondary_y=True)
+        
+        st.plotly_chart(fig_temporal, use_container_width=True)
+    
+    # 7. DELIVERY MODE ANALYSIS
+    st.markdown("### 🚚 Delivery Mode Analysis")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if 'DeliveryMode' in filtered_df.columns:
+            mode_counts = filtered_df['DeliveryMode'].value_counts()
+            fig_mode = px.pie(
+                values=mode_counts.values,
+                names=mode_counts.index,
+                title="Delivery Mode Distribution",
+                hole=0.3,
+                color_discrete_sequence=px.colors.qualitative.Pastel
+            )
+            st.plotly_chart(fig_mode, use_container_width=True)
+    
+    with col2:
+        if 'DeliveryMode' in filtered_df.columns and 'Price' in filtered_df.columns:
+            mode_price = filtered_df.groupby('DeliveryMode')['Price'].mean()
+            fig_mode_price = px.bar(
+                x=mode_price.index,
+                y=mode_price.values,
+                title="Average Price by Delivery Mode",
+                labels={'x': 'Delivery Mode', 'y': 'Average Price'},
+                color=mode_price.values,
+                color_continuous_scale='Purples'
+            )
+            st.plotly_chart(fig_mode_price, use_container_width=True)
+    
+    # 8. PACKAGE TYPE ANALYSIS
+    if 'PackageType' in filtered_df.columns:
+        st.markdown("### 📦 Package Type Analysis")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            package_counts = filtered_df['PackageType'].value_counts()
+            fig_package = px.pie(
+                values=package_counts.values,
+                names=package_counts.index,
+                title="Package Type Distribution",
+                color_discrete_sequence=px.colors.qualitative.Bold
+            )
+            st.plotly_chart(fig_package, use_container_width=True)
+        
+        with col2:
+            if 'WeightKg' in filtered_df.columns:
+                package_weight = filtered_df.groupby('PackageType')['WeightKg'].mean()
+                fig_package_weight = px.bar(
+                    x=package_weight.index,
+                    y=package_weight.values,
+                    title="Average Weight by Package Type",
+                    labels={'x': 'Package Type', 'y': 'Average Weight (Kg)'},
+                    color=package_weight.values,
+                    color_continuous_scale='Greens'
+                )
+                st.plotly_chart(fig_package_weight, use_container_width=True)
+    
+    # 9. DELAY REASON ANALYSIS
+    if 'DelayReason' in filtered_df.columns:
+        st.markdown("### ⚠️ Delay Reason Analysis")
+        delay_reasons = filtered_df[filtered_df['DelayReason'].str.contains('None|nan', case=False, na=True) == False]
+        if not delay_reasons.empty and 'DelayReason' in delay_reasons.columns:
+            reason_counts = delay_reasons['DelayReason'].value_counts()
+            fig_reasons = px.bar(
+                x=reason_counts.values,
+                y=reason_counts.index,
+                orientation='h',
+                title="Delay Reasons Analysis",
+                labels={'x': 'Number of Delays', 'y': 'Reason'},
+                color=reason_counts.values,
+                color_continuous_scale='Reds'
+            )
+            st.plotly_chart(fig_reasons, use_container_width=True)
 
 # -------------------------------
 # ✅ PREDICTION INTERFACE
 # -------------------------------
 def show_prediction_interface(model, feature_names, model_artifacts):
-    """Show the prediction interface with correct feature mapping"""
+    """Show the prediction interface"""
     st.markdown("---")
     st.header("🔮 AI Delivery Delay Prediction")
-    st.markdown("Predict potential delivery delays using our trained machine learning model")
     
     with st.container():
         st.markdown('<div class="prediction-box">', unsafe_allow_html=True)
@@ -239,12 +509,12 @@ def show_prediction_interface(model, feature_names, model_artifacts):
             col1, col2, col3 = st.columns(3)
             
             with col1:
-                weight = st.number_input("📦 Weight (kg)", min_value=0.1, max_value=1000.0, value=25.0, step=0.1, help="Package weight in kilograms")
-                pickup_hour = st.slider("⏰ Pickup Hour", 0, 23, 12, help="Hour of the day for pickup")
+                weight = st.number_input("📦 Weight (kg)", min_value=0.1, max_value=1000.0, value=25.0, step=0.1)
+                pickup_hour = st.slider("⏰ Pickup Hour", 0, 23, 12)
             
             with col2:
-                price = st.number_input("💰 Price (PKR)", min_value=10.0, max_value=50000.0, value=1500.0, step=50.0, help="Shipping cost in Pakistani Rupees")
-                booking_month = st.slider("📅 Booking Month", 1, 12, 6, help="Month when booking was made")
+                price = st.number_input("💰 Price (PKR)", min_value=10.0, max_value=50000.0, value=1500.0, step=50.0)
+                booking_month = st.slider("📅 Booking Month", 1, 12, 6)
             
             with col3:
                 service_options = model_artifacts.get('service_categories', ['Economy', 'Express', 'Overnight', 'Same Day'])
@@ -252,7 +522,7 @@ def show_prediction_interface(model, feature_names, model_artifacts):
                 
                 service_type = st.selectbox("🚚 Service Type", options=service_options, index=0)
                 delivery_mode = st.selectbox("📦 Delivery Mode", options=delivery_options, index=0)
-                is_inter_city = st.checkbox("🏙️ Inter-City Shipment", value=True, help="Check if shipment is between different cities")
+                is_inter_city = st.checkbox("🏙️ Inter-City Shipment", value=True)
             
             predict_button = st.form_submit_button("🎯 Predict Delivery Status", use_container_width=True)
             
@@ -267,8 +537,8 @@ def show_prediction_interface(model, feature_names, model_artifacts):
                         input_data['PickupHour'] = [pickup_hour]
                         input_data['BookingMonth'] = [booking_month]
                         input_data['IsInterCity'] = [int(is_inter_city)]
-                        input_data['FromMajorCity'] = [1]  # Default assumption
-                        input_data['ToMajorCity'] = [1]    # Default assumption
+                        input_data['FromMajorCity'] = [1]
+                        input_data['ToMajorCity'] = [1]
                         input_data['IsPeakHour'] = [int(8 <= pickup_hour <= 18)]
                         
                         # Set one-hot encoded features
@@ -282,7 +552,7 @@ def show_prediction_interface(model, feature_names, model_artifacts):
                         
                         # Create feature DataFrame with correct order
                         features_df = pd.DataFrame(input_data)
-                        features_df = features_df[feature_names]  # Critical: maintain feature order
+                        features_df = features_df[feature_names]
                         
                         # Make prediction
                         prediction = model.predict(features_df)[0]
@@ -295,7 +565,6 @@ def show_prediction_interface(model, feature_names, model_artifacts):
                         st.subheader("📊 Prediction Results")
                         
                         if prediction == 1:
-                            st.markdown('<div class="danger-box">', unsafe_allow_html=True)
                             st.error("## 🚨 HIGH RISK OF DELAY")
                             st.write(f"**Confidence Level:** {confidence:.1f}%")
                             st.progress(int(confidence) / 100)
@@ -306,17 +575,8 @@ def show_prediction_interface(model, feature_names, model_artifacts):
                             with col_b:
                                 st.metric("On-Time Probability", f"{prediction_proba[0]:.1%}")
                             
-                            st.warning("""
-                            **🚚 Recommended Actions:**
-                            - Consider expedited shipping option
-                            - Schedule for early morning pickup (6-8 AM)
-                            - Assign to experienced driver team
-                            - Enable real-time tracking and monitoring
-                            - Prepare customer communication plan
-                            """)
-                            st.markdown('</div>', unsafe_allow_html=True)
+                            st.warning("**🚚 Recommended Actions:** Consider expedited shipping, early pickup scheduling, and close monitoring.")
                         else:
-                            st.markdown('<div class="success-box">', unsafe_allow_html=True)
                             st.success("## ✅ ON-TIME DELIVERY EXPECTED")
                             st.write(f"**Confidence Level:** {confidence:.1f}%")
                             st.progress(int(confidence) / 100)
@@ -327,32 +587,10 @@ def show_prediction_interface(model, feature_names, model_artifacts):
                             with col_b:
                                 st.metric("Delay Probability", f"{prediction_proba[1]:.1%}")
                             
-                            st.info("""
-                            **📦 Status Overview:**
-                            - Shipment is likely to arrive as scheduled
-                            - Standard monitoring procedures apply
-                            - Customer can expect timely delivery
-                            - Continue with regular operational workflow
-                            """)
-                            st.markdown('</div>', unsafe_allow_html=True)
-                        
-                        # Feature importance insight
-                        with st.expander("🔍 AI Insights & Factors"):
-                            st.write("**Key factors influencing this prediction:**")
-                            factors = [
-                                ("Service Type", "High impact on delivery timeline"),
-                                ("Pickup Time", "Affects routing and scheduling"),
-                                ("Weight", "Impacts handling and transit time"),
-                                ("Delivery Mode", "Determines transportation method"),
-                                ("Inter-City", "Affects distance and route complexity")
-                            ]
-                            
-                            for factor, impact in factors:
-                                st.write(f"• **{factor}**: {impact}")
+                            st.info("**📦 Status Overview:** Shipment is likely to arrive as scheduled with standard monitoring.")
                     
                     except Exception as e:
                         st.error(f"❌ Prediction error: {str(e)}")
-                        st.info("Please ensure all model files are properly generated by running the notebook.")
         
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -379,12 +617,7 @@ def render_sidebar():
             st.sidebar.write(f"Accuracy: {artifacts['model_accuracy']:.1%}")
     else:
         st.sidebar.error("AI Model: ❌ Not Found")
-        st.sidebar.info("""
-        **To enable AI predictions:**
-        1. Run `fastex_analysis.ipynb`
-        2. Execute all cells
-        3. Restart this app
-        """)
+        st.sidebar.info("Run the notebook first to generate AI models")
     
     st.sidebar.markdown("---")
     st.sidebar.header("🛠️ Tools")
@@ -399,7 +632,6 @@ def render_sidebar():
     **Need help?**
     - 📧 analytics@daewoofastex.com
     - 📱 +92-XXX-XXXXXXX
-    - 🏢 Daewoo Express HQ
     """)
     
     return uploaded_file, model, feature_names, artifacts
@@ -422,7 +654,7 @@ def main():
             # Filters Section
             st.header("🔍 Data Filters & Segmentation")
             
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3, col4 = st.columns(4)
             
             with col1:
                 origin_cities = sorted(df['OriginCity'].unique()) if 'OriginCity' in df.columns else []
@@ -436,6 +668,10 @@ def main():
                 service_types = sorted(df['ServiceType'].unique()) if 'ServiceType' in df.columns else []
                 selected_service = st.multiselect("🚚 Service Type", service_types, default=service_types)
             
+            with col4:
+                delivery_modes = sorted(df['DeliveryMode'].unique()) if 'DeliveryMode' in df.columns else []
+                selected_delivery = st.multiselect("📦 Delivery Mode", delivery_modes, default=delivery_modes)
+            
             # Apply filters
             filtered_df = df.copy()
             if selected_origin:
@@ -444,44 +680,63 @@ def main():
                 filtered_df = filtered_df[filtered_df['DestinationCity'].isin(selected_dest)]
             if selected_service:
                 filtered_df = filtered_df[filtered_df['ServiceType'].isin(selected_service)]
+            if selected_delivery:
+                filtered_df = filtered_df[filtered_df['DeliveryMode'].isin(selected_delivery)]
             
             filtered_kpis = calculate_kpis(filtered_df)
             
             # KPI Dashboard
             st.header("📊 Performance Dashboard")
             
-            kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
+            # Create metric cards
+            col1, col2, col3, col4, col5 = st.columns(5)
             
-            with kpi1:
-                st.metric("Total Shipments", f"{filtered_kpis['total_shipments']:,}")
-            with kpi2:
-                st.metric("Total Revenue", f"₹{filtered_kpis['total_revenue']:,.0f}")
-            with kpi3:
-                st.metric("Avg Weight", f"{filtered_kpis['avg_weight']:.1f} kg")
-            with kpi4:
-                st.metric("On-Time Rate", f"{filtered_kpis['on_time_rate']:.1f}%")
-            with kpi5:
+            with col1:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div style="font-size:2rem; font-weight:bold; color:#0047ba;">{filtered_kpis['total_shipments']:,}</div>
+                    <div style="color:#666; font-weight:500;">Total Shipments</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col2:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div style="font-size:2rem; font-weight:bold; color:#00a650;">₹{filtered_kpis['total_revenue']:,.0f}</div>
+                    <div style="color:#666; font-weight:500;">Total Revenue</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col3:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div style="font-size:2rem; font-weight:bold; color:#ff6b00;">{filtered_kpis['on_time_rate']:.1f}%</div>
+                    <div style="color:#666; font-weight:500;">On-Time Rate</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col4:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div style="font-size:2rem; font-weight:bold; color:#8a2be2;">{filtered_kpis['avg_weight']:.1f} kg</div>
+                    <div style="color:#666; font-weight:500;">Avg Weight</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col5:
                 delivery_days = filtered_kpis.get('avg_delivery_days', 'N/A')
-                st.metric("Avg Delivery Days", f"{delivery_days:.1f}" if delivery_days != 'N/A' else "N/A")
+                display_value = f"{delivery_days:.1f}" if delivery_days != 'N/A' else "N/A"
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div style="font-size:2rem; font-weight:bold; color:#0047ba;">{display_value}</div>
+                    <div style="color:#666; font-weight:500;">Avg Delivery Days</div>
+                </div>
+                """, unsafe_allow_html=True)
             
-            # Visualizations
-            st.header("📈 Analytics & Insights")
-            
-            viz1, viz2 = st.columns(2)
-            
-            with viz1:
-                if 'ServiceType' in filtered_df.columns:
-                    service_counts = filtered_df['ServiceType'].value_counts()
-                    fig1 = px.pie(values=service_counts.values, names=service_counts.index, 
-                                title="📦 Shipments by Service Type", hole=0.4)
-                    st.plotly_chart(fig1, use_container_width=True)
-            
-            with viz2:
-                if 'OriginCity' in filtered_df.columns:
-                    city_counts = filtered_df['OriginCity'].value_counts().head(10)
-                    fig2 = px.bar(x=city_counts.values, y=city_counts.index, orientation='h',
-                                title="🏙️ Top Origin Cities", labels={'x': 'Shipments', 'y': 'City'})
-                    st.plotly_chart(fig2, use_container_width=True)
+            # Comprehensive Visualizations
+            st.markdown("---")
+            st.header("📈 Comprehensive Analytics & Insights")
+            create_comprehensive_visualizations(df, filtered_df)
             
             # AI Prediction Section
             if prediction_model:
@@ -497,12 +752,13 @@ def main():
                     
                     # Summary sheet
                     summary_data = {
-                        'Metric': ['Total Shipments', 'Total Revenue', 'Average Weight', 'On-Time Rate', 'Average Delivery Days'],
+                        'Metric': ['Total Shipments', 'Total Revenue', 'Average Weight', 'On-Time Rate', 'Delay Rate', 'Average Delivery Days'],
                         'Value': [
                             filtered_kpis['total_shipments'],
                             f"₹{filtered_kpis['total_revenue']:,.2f}",
                             f"{filtered_kpis['avg_weight']:.2f} kg",
                             f"{filtered_kpis['on_time_rate']:.2f}%",
+                            f"{filtered_kpis['delay_rate']:.2f}%",
                             f"{filtered_kpis.get('avg_delivery_days', 'N/A')}"
                         ]
                     }
@@ -513,17 +769,17 @@ def main():
             excel_data = convert_to_excel(filtered_df)
             
             st.download_button(
-                label="📊 Download Excel Report",
+                label="📊 Download Comprehensive Excel Report",
                 data=excel_data,
-                file_name=f"daewoo_report_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                file_name=f"daewoo_comprehensive_report_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True
             )
             
             # Data Preview
             with st.expander("🔍 Preview Filtered Data"):
-                st.dataframe(filtered_df.head(100), use_container_width=True)
-                st.caption(f"Showing {min(100, len(filtered_df))} of {len(filtered_df):,} records")
+                st.dataframe(filtered_df.head(50), use_container_width=True)
+                st.caption(f"Showing {min(50, len(filtered_df))} of {len(filtered_df):,} filtered records")
     
     else:
         # Welcome screen
@@ -531,27 +787,27 @@ def main():
         ## 🎯 Welcome to Daewoo FastEx Analytics Platform
         
         ### 🚀 Get Started:
-        1. **Run the Notebook** → Execute `fastex_analysis.ipynb` to train AI models
-        2. **Upload Your Data** → Use the sidebar to upload shipment data
-        3. **Analyze Performance** → View interactive dashboards and KPIs
-        4. **AI Predictions** → Get intelligent delay forecasts
-        5. **Export Reports** → Download customized analytics reports
+        1. **Upload Your Data** → Use the sidebar to upload shipment data (CSV/Excel)
+        2. **Explore Analytics** → View comprehensive visualizations and insights
+        3. **AI Predictions** → Get intelligent delay forecasts
+        4. **Export Reports** → Download customized analytics reports
         
         ### 📊 Supported Data Format:
-        Your Excel/CSV should include:
+        Your file should include these columns:
         - `TrackingID`, `BookingDate`, `PickupDate`, `DeliveryDate`
-        - `OriginCity`, `DestinationCity`, `ServiceType`, `DeliveryMode`  
-        - `WeightKg`, `Price`, `Status`, `DelayReason` (optional)
+        - `OriginCity`, `DestinationCity`, `ServiceType`, `DeliveryMode`
+        - `WeightKg`, `Price`, `Status`, `PackageType`, `DelayReason`
         
-        ### 🎯 Key Features:
-        - **Real-time Analytics** - Interactive dashboards
-        - **AI Delay Prediction** - Machine learning forecasts
-        - **Performance KPIs** - Key metrics and trends
-        - **Data Export** - Excel reports with summaries
-        - **Smart Filtering** - Segment data by multiple criteria
+        ### 🎯 Comprehensive Analytics Include:
+        - Service Type Distribution & Performance
+        - Geographical Analysis (Cities & Routes)
+        - Price & Weight Distribution
+        - Delivery Performance Metrics
+        - Temporal Trends Analysis
+        - Package Type Insights
+        - Delay Reason Analysis
         """)
         
-        # Quick stats
         if prediction_model:
             st.success("✅ AI Prediction model is loaded and ready!")
         else:
