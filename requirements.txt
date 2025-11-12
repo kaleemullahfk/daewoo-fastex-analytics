@@ -4,6 +4,7 @@ streamlit==1.39.0
 # Data manipulation
 pandas
 numpy
+openpyxl
 
 # Data visualization
 plotly
